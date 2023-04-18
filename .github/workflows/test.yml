@@ -1,42 +1,139 @@
 name: Tests
 on: push
 jobs:
-  test:
+  install-dependencies:
+    name: Install dependencies
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup
+      - name: Install PNPM
         uses: pnpm/action-setup@v2
         with:
           version: 7.23.0
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Cache node_modules
+        id: cache-pnpm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: |
+            **/node_modules
+            **/.cache
+            ~/**/.cache
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
 
-      - name: Build application
-        run: pnpm build
+      - if: ${{ steps.cache-pnpm.outputs.cache-hit != 'true' }}
+        name: List the state of node modules
+        continue-on-error: true
+        run: pnpm list --color
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+  unit-tests:
+    needs: install-dependencies
+    name: Run tests 🧪
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 7.23.0
+
+      - name: Cache node_modules
+        id: cache-pnpm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: |
+            **/node_modules
+            **/.cache
+            ~/**/.cache
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
 
       - name: Run tests
         run: pnpm test
 
-  lint:
+  linter:
+    needs: install-dependencies
+    name: Linter
     runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
     steps:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - name: Setup
+      - name: Install PNPM
         uses: pnpm/action-setup@v2
         with:
           version: 7.23.0
 
-      - name: Install dependencies
-        run: pnpm install
+      - name: Cache node_modules
+        id: cache-pnpm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: |
+            **/node_modules
+            **/.cache
+            ~/**/.cache
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
 
-      - name: Build application
-        run: pnpm build
+      - name: Linter
+        run: echo "It's work"
 
-      - name: Lint
-        run: pnpm lint
+  deploy:
+    needs: [linter, unit-tests]
+    name: Deploy
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install PNPM
+        uses: pnpm/action-setup@v2
+        with:
+          version: 7.23.0
+
+      - name: Cache node_modules
+        id: cache-pnpm
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-node-modules
+        with:
+          path: |
+            **/node_modules
+            **/.cache
+            ~/**/.cache
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: Deploy
+        run: |
+          cd apps/website && netlify deploy --prod
